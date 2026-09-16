@@ -1,0 +1,11 @@
+{
+    "files.exclude": {
+      "**/.pio": true
+    },
+    "files.watcherExclude": {
+      "**/.pio": true
+    },
+    "search.exclude": {
+      "**/.pio": true
+    }
+  }
