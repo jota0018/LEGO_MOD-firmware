@@ -25,7 +25,10 @@
 #define TRIPLE_CLICK_MS  1500   // 3 clicks en 1.5 s  → Buscar OTA
 #define DEBOUNCE_MS      40
 
-#define GITHUB_OWNER     "jota0018"
+#ifndef GITHUB_OWNER
+#define GITHUB_OWNER "jota0018"    // Se define en platformio.ini (build_flags)
+#endif
+
 // GITHUB_REPO viene del ini (build_flags)
 
 // ============================================================================

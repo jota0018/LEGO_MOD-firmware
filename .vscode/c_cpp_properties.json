@@ -490,6 +490,7 @@
                 "PLATFORMIO=60119",
                 "ARDUINO_ESP32_DEV",
                 "FIRMWARE_VERSION=\"1.0.1\"",
+                "GITHUB_OWNER=\"jota0018\"",
                 "GITHUB_REPO=\"jota0018/LEGO_MOD-firmware\"",
                 "GITHUB_HOST=\"raw.githubusercontent.com\"",
                 "DEVICE_NAME=\"LEGO\"",
