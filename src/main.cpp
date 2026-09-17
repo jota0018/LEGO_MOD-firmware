@@ -7,6 +7,14 @@
 #define FIRMWARE_VERSION "0.0.0"   // Se define en platformio.ini (build_flags)
 #endif
 
+#ifndef DEVICE_NAME
+#define DEVICE_NAME "Central"      // Se define en platformio.ini (build_flags)
+#endif
+
+#ifndef GITHUB_REPO
+#define GITHUB_REPO "jota0018/LEGO_MOD-firmware"  // Se define en platformio.ini
+#endif
+
 // ============================================================================
 // CONFIGURACIÓN
 // ============================================================================
@@ -18,12 +26,12 @@
 #define DEBOUNCE_MS      40
 
 #define GITHUB_OWNER     "jota0018"
-#define GITHUB_REPO      "LEGO_MOD-firmware"   // Repo PÚBLICO con los releases
+// GITHUB_REPO viene del ini (build_flags)
 
 // ============================================================================
 // COMPONENTES LEGO
 // ============================================================================
-DeviceIdentity identity;
+DeviceIdentity identity(DEVICE_NAME);
 WiFiManagerAP  wifiManager(LED_STATUS, BUTTON_PIN, &identity);
 OTAManager     ota(LED_STATUS);
 
@@ -52,11 +60,12 @@ void setup() {
   Serial.println("\n=================================");
   Serial.println("🚀 INICIANDO SISTEMA");
   Serial.printf("   Firmware: v%s\n", FIRMWARE_VERSION);
+  Serial.printf("   Dispositivo: %s\n", DEVICE_NAME);
   Serial.println("=================================\n");
 
   identity.begin();
-  wifiManager.begin("Central");
-  pinMode(BUTTON_PIN, INPUT_PULLUP);  // ← AGREGAR ESTA LÍNEA
+  wifiManager.begin(DEVICE_NAME);
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
   ota.begin(GITHUB_OWNER, GITHUB_REPO, FIRMWARE_VERSION);
 }
 

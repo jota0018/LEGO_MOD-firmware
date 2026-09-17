@@ -57,7 +57,7 @@ long DeviceIdentity::getLoRaFrequencyHz() {
 
 String DeviceIdentity::_generateDeviceId() {
   String hash = _getMacHashHex();
-  return _prefix + "_" + hash;
+  return _prefix + "-" + hash;
 }
 
 String DeviceIdentity::_getMacHashHex() {

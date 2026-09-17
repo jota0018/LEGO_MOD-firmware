@@ -3,9 +3,15 @@
 
 #include <Arduino.h>
 
+// Fallback si no está definido en platformio.ini
+#ifndef DEVICE_NAME
+#define DEVICE_NAME "Central"
+#endif
+
 class DeviceIdentity {
 public:
-  DeviceIdentity(String prefix = "Central");
+  // Si no se proporciona prefix, usa DEVICE_NAME del ini
+  DeviceIdentity(String prefix = DEVICE_NAME);
 
   void begin();
 

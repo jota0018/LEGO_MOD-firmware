@@ -23,6 +23,7 @@ public:
   OTAManager(int ledStatusPin = 12);
 
   // owner/repo de GitHub donde se publican los releases
+  // Si no se proporcionan, usa los valores del platformio.ini (GITHUB_REPO, GITHUB_HOST)
   void begin(const char* githubOwner, const char* githubRepo, const char* currentVersion);
 
   // Llamar en loop(): confirma el firmware nuevo tras 20 s estable
