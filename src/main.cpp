@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <WiFi.h>
 #include "DeviceIdentity.h"
 #include "WiFiManagerAP.h"
 #include "OTAManager.h"
@@ -32,6 +33,20 @@
 // GITHUB_REPO viene del ini (build_flags)
 
 // ============================================================================
+// CONEXIÓN A INTERNET (no bloqueante)
+// ============================================================================
+#define WIFI_CONNECT_TIMEOUT_MS  10000   // máx esperando WL_CONNECTED tras WiFi.begin()
+#define WIFI_RETRY_BASE_MS       5000    // backoff base
+#define WIFI_RETRY_MAX_MS        60000   // backoff tope
+
+enum NetState { NET_IDLE, NET_CONNECTING, NET_CONNECTED, NET_DISCONNECTED };
+
+NetState      netState           = NET_IDLE;
+unsigned long netStateChangedAt  = 0;
+unsigned long lastConnectAttempt = 0;
+uint8_t       reconnectAttempts  = 0;
+
+// ============================================================================
 // COMPONENTES LEGO
 // ============================================================================
 DeviceIdentity identity(DEVICE_NAME);
@@ -52,6 +67,9 @@ bool verifyRollbackLater() { return true; }
 
 void monitorButton();
 void runOTA();
+void checkInternetConnection();
+void updateLED();
+unsigned long currentBackoff();
 
 // ============================================================================
 // SETUP
@@ -66,6 +84,9 @@ void setup() {
   Serial.printf("   Dispositivo: %s\n", DEVICE_NAME);
   Serial.println("=================================\n");
 
+  pinMode(LED_STATUS, OUTPUT);
+  digitalWrite(LED_STATUS, LOW);   // arranca apagado; updateLED() es el único que lo toca de ahí en más
+
   identity.begin();
   wifiManager.begin(DEVICE_NAME);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
@@ -79,6 +100,8 @@ void loop() {
   wifiManager.handle();
   ota.handle();
   monitorButton();
+  checkInternetConnection();
+  updateLED();   // único punto del programa que escribe LED_STATUS fuera de AP/OTA
 }
 
 // ============================================================================
@@ -89,7 +112,9 @@ void runOTA() {
   if (wifiManager.isActive()) wifiManager.deactivate();
   ota.checkAndUpdate(wifiManager.getSSID(), wifiManager.getPass());
   // Si hubo actualización, el dispositivo ya se reinició.
-  // Si no, seguimos operando normal.
+  // Si no, seguimos operando normal. (checkAndUpdate() es bloqueante:
+  // mientras corre, nadie más toca el LED, así que su parpadeo rápido
+  // no compite con updateLED().)
 }
 
 void monitorButton() {
@@ -130,4 +155,94 @@ void monitorButton() {
       }
     }
   }
+}
+
+// Backoff exponencial (5s, 10s, 20s, 40s ... tope 60s)
+unsigned long currentBackoff() {
+  unsigned long backoff = WIFI_RETRY_BASE_MS * (1UL << min(reconnectAttempts, (uint8_t)6));
+  return min(backoff, (unsigned long)WIFI_RETRY_MAX_MS);
+}
+
+// Máquina de estados no bloqueante: nunca usa while/delay para esperar
+// la conexión. Solo actualiza netState — NO toca el LED (eso es trabajo
+// exclusivo de updateLED()).
+void checkInternetConnection() {
+  // Si el AP de configuración está activo, no tocamos el STA
+  if (wifiManager.isActive()) {
+    if (netState != NET_IDLE) {
+      Serial.println("📡 AP activo → pausando conexión a internet");
+      netState = NET_IDLE;
+    }
+    return;
+  }
+
+  // ---- Conectado ----
+  if (WiFi.status() == WL_CONNECTED) {
+    if (netState != NET_CONNECTED) {
+      netState = NET_CONNECTED;
+      reconnectAttempts = 0;
+      Serial.println("✅ Internet conectado");
+      Serial.printf("   IP: %s | RSSI: %d dBm\n", WiFi.localIP().toString().c_str(), WiFi.RSSI());
+    }
+    return;
+  }
+
+  String ssid = wifiManager.getSSID();
+  String pass = wifiManager.getPass();
+  if (ssid.length() == 0) {
+    if (netState != NET_IDLE) {
+      Serial.println("⚠️ Sin credenciales WiFi guardadas");
+      netState = NET_IDLE;
+    }
+    return;
+  }
+
+  unsigned long now = millis();
+
+  switch (netState) {
+    case NET_CONNECTED:
+      Serial.println("❌ Se perdió la conexión a internet");
+      netState = NET_DISCONNECTED;
+      lastConnectAttempt = 0;  // fuerza reintento inmediato
+      break;
+
+    case NET_CONNECTING:
+      if (now - netStateChangedAt >= WIFI_CONNECT_TIMEOUT_MS) {
+        reconnectAttempts++;
+        Serial.printf("⏱️ Timeout conectando (intento #%d)\n", reconnectAttempts);
+        netState = NET_DISCONNECTED;
+        lastConnectAttempt = now;
+      }
+      break;
+
+    case NET_IDLE:
+    case NET_DISCONNECTED:
+    default:
+      if (lastConnectAttempt == 0 || now - lastConnectAttempt >= currentBackoff()) {
+        Serial.printf("🔄 Conectando a WiFi \"%s\"...\n", ssid.c_str());
+        WiFi.mode(WIFI_STA);
+        WiFi.begin(ssid.c_str(), pass.c_str());
+        lastConnectAttempt = now;
+        netStateChangedAt  = now;
+        netState = NET_CONNECTING;
+      }
+      break;
+  }
+}
+
+// Único punto del programa (fuera del bloqueo de OTA) que escribe LED_STATUS.
+// Prioridad: AP activo (parpadeo 500/500) > estado de conexión (sólido on/off).
+void updateLED() {
+  if (wifiManager.isActive()) {
+    static unsigned long lastToggle = 0;
+    static bool ledOn = false;
+    if (millis() - lastToggle >= 500) {
+      lastToggle = millis();
+      ledOn = !ledOn;
+      digitalWrite(LED_STATUS, ledOn ? HIGH : LOW);
+    }
+    return;
+  }
+
+  digitalWrite(LED_STATUS, (netState == NET_CONNECTED) ? HIGH : LOW);
 }

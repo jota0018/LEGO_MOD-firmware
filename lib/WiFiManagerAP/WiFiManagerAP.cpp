@@ -32,7 +32,7 @@ void WiFiManagerAP::handle() {
     _blinkLED();
     _checkAPTimeout();
   } else {
-    digitalWrite(_ledStatusPin, HIGH);
+   // digitalWrite(_ledStatusPin, HIGH);
   }
 }
 
@@ -73,7 +73,7 @@ void WiFiManagerAP::deactivate() {
   _isAPActive = false;
   _server.stop();
   WiFi.mode(WIFI_OFF);
-  digitalWrite(_ledStatusPin, HIGH);
+//  digitalWrite(_ledStatusPin, HIGH);
 
   Serial.println("🔌 [MODO AP DESACTIVADO]\n");
 }
